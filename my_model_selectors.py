@@ -105,5 +105,32 @@ class SelectorCV(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+        # implement model selection using CV
+        best_num_components = self.min_n_components
+        best_avg_logL = float("-inf")
+        logLs = []
+        for num_components in range(self.min_n_components, self.max_n_components):
+            try:
+                model = GaussianHMM(n_components=num_components, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False)
+            except ValueError:
+                continue
+
+            try:
+                for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                    train_x, train_lengths = combine_sequences(cv_train_idx, self.sequences)
+                    test_x, test_lengths = combine_sequences(cv_test_idx, self.sequences)
+                    model.fit(train_x, train_lengths)
+                    logL = model.score(test_x, test_lengths)
+                    logLs.append(logL)
+            except:
+                pass
+            
+            if logLs:
+                avg_logL = np.mean(logLs)
+
+                if avg_logL > best_avg_logL:
+                    best_model = model
+                    best_avg_logL = avg_logL
+        
+        return self.base_model(best_num_components)
