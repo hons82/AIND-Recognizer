@@ -76,9 +76,21 @@ class SelectorBIC(ModelSelector):
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection based on BIC scores
-        raise NotImplementedError
-
+        best_num_components = self.min_n_components
+        best_bic = float("-inf")
+        for num_components in range(self.min_n_components, self.max_n_components):
+            try:
+                model = self.base_model(num_components)
+                logL = model.score(self.X, self.lengths)
+                logN = np.log(len(self.X))
+                p = p = i ** 2 + 2 * i * model.n_features - 1
+                bic = -2 * logL + p * logN
+                if bic > best_bic:
+                    best_num_components = num_components
+                    best_bic = bic
+            except:
+                pass
+        return self.base_model(best_num_components)
 
 class SelectorDIC(ModelSelector):
     ''' select best model based on Discriminative Information Criterion
@@ -94,8 +106,21 @@ class SelectorDIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
-
+        best_num_components = self.min_n_components
+        best_dic = float("-inf")
+        for num_components in range(self.min_n_components, self.max_n_components):
+            try:
+                model = self.base_model(num_components)
+                for word in self.hwords: 
+                    if word is not self.this_word:
+                        score = model.score(self.hwords[word][0], self.hwords[word][1])
+                        dic = model.score(self.X, self.lengths) - np.mean(score)
+                        if dic > best_dic:
+                            best_num_components = num_components
+                            best_dic = dic
+            except:
+                pass
+        return self.base_model(best_num_components)
 
 class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
@@ -108,15 +133,10 @@ class SelectorCV(ModelSelector):
         # implement model selection using CV
         best_num_components = self.min_n_components
         best_avg_logL = float("-inf")
-        logLs = []
         for num_components in range(self.min_n_components, self.max_n_components):
+            logLs = []
             try:
-                model = GaussianHMM(n_components=num_components, covariance_type="diag", n_iter=1000,
-                                    random_state=self.random_state, verbose=False)
-            except ValueError:
-                continue
-
-            try:
+                model = self.base_model(num_components)
                 for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
                     train_x, train_lengths = combine_sequences(cv_train_idx, self.sequences)
                     test_x, test_lengths = combine_sequences(cv_test_idx, self.sequences)
@@ -128,9 +148,8 @@ class SelectorCV(ModelSelector):
             
             if logLs:
                 avg_logL = np.mean(logLs)
-
                 if avg_logL > best_avg_logL:
-                    best_model = model
+                    best_num_components = num_components
                     best_avg_logL = avg_logL
         
         return self.base_model(best_num_components)
