@@ -77,15 +77,15 @@ class SelectorBIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         best_num_components = self.min_n_components
-        best_bic = float("-inf")
-        for num_components in range(self.min_n_components, self.max_n_components):
+        best_bic = float("inf")
+        for num_components in range(self.min_n_components, self.max_n_components + 1):
             try:
                 model = self.base_model(num_components)
                 logL = model.score(self.X, self.lengths)
                 logN = np.log(len(self.X))
-                p = p = i ** 2 + 2 * i * model.n_features - 1
-                bic = -2 * logL + p * logN
-                if bic > best_bic:
+                p = (num_components ** 2) + (2 * num_components * model.n_features) - 1
+                bic = (-2 * logL) + (p * logN)
+                if bic < best_bic:
                     best_num_components = num_components
                     best_bic = bic
             except:
@@ -108,16 +108,17 @@ class SelectorDIC(ModelSelector):
         # TODO implement model selection based on DIC scores
         best_num_components = self.min_n_components
         best_dic = float("-inf")
-        for num_components in range(self.min_n_components, self.max_n_components):
+        for num_components in range(self.min_n_components, self.max_n_components + 1):
             try:
                 model = self.base_model(num_components)
-                for word in self.hwords: 
-                    if word is not self.this_word:
-                        score = model.score(self.hwords[word][0], self.hwords[word][1])
-                        dic = model.score(self.X, self.lengths) - np.mean(score)
-                        if dic > best_dic:
-                            best_num_components = num_components
-                            best_dic = dic
+                scores = []
+                for w, (X, lengths) in self.hwords.items():
+                    if w != self.this_word:
+                        scores.append(model.score(X, lengths))
+                dic = model.score(self.X, self.lengths) - np.mean(scores)
+                if dic > best_dic:
+                    best_num_components = num_components
+                    best_dic = dic
             except:
                 pass
         return self.base_model(best_num_components)
@@ -133,7 +134,7 @@ class SelectorCV(ModelSelector):
         # implement model selection using CV
         best_num_components = self.min_n_components
         best_avg_logL = float("-inf")
-        for num_components in range(self.min_n_components, self.max_n_components):
+        for num_components in range(self.min_n_components, self.max_n_components + 1):
             logLs = []
             try:
                 model = self.base_model(num_components)
